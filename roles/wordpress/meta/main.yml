@@ -1,15 +1,14 @@
 galaxy_info:
-  author: Thomas Lochet
-  description: Un role pour installer wordpress
-  company: Sup de Vinci
+  author: thomaslochet
+  description: WordPress installation and configuration role
+  company: supdevinci
   license: MIT
-  min_ansible_version: 2.1
+  min_ansible_version: 2.9
   platforms:
     - name: Ubuntu
       versions:
-        - 22.04
-    - name: EL
-      versions:
-        - "7"
-        - "8"
+        - bionic
+        - focal
+        - jammy
+
 dependencies: []
