@@ -1,0 +1,14 @@
+---
+- name: Install required packages
+  include_tasks: paquets.yml
+
+- name: Configure MariaDB
+  include_tasks: mariadb.yml
+
+- name: Configure Apache
+  include_tasks: apache.yml
+
+- name: Deploy WordPress
+  include_tasks: wordpress.yml
+
+

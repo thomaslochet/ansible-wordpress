@@ -1,0 +1,8 @@
+---
+wordpress_db_name: wordpress
+wordpress_db_user: supdevinci
+wordpress_db_password: SupdeVinci2025!
+wordpress_db_root_password: SuperSupdeVinci2025!
+wordpress_site_dir: /var/www/html
+wordpress_url: https://wordpress.org/latest.zip
+apache_user: "{{ 'www-data' if ansible_os_family == 'Debian' else 'apache' }}"

@@ -1,0 +1,39 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: Test du role
+  hosts: all
+  become: true
+  vars:
+    wordpress_db_name: wordpress
+    wordpress_db_user: supdevinci
+    wordpress_db_password: SupdeVinci2025!
+    wordpress_db_root_password: SuperSupdeVinci2025!
+    wordpress_site_dir: /var/www/html
+    wordpress_url: https://wordpress.org/latest.zip
+    apache_user: "{{ 'www-data' if ansible_os_family == 'Debian' else 'apache' }}"
+  tasks:
+    - name: Install required packages
+      include_tasks: ../tasks/paquets.yml
+
+    - name: Configure MariaDB
+      include_tasks: ../tasks/mariadb.yml
+
+    - name: Configure Apache
+      include_tasks: ../tasks/apache.yml
+
+    - name: Deploy WordPress
+      include_tasks: ../tasks/wordpress.yml
+  
+
+  handlers:
+    - name: restart apache (Ubuntu)
+      ansible.builtin.shell: "service apache2 restart"
+      when: ansible_distribution == "Ubuntu"
+
+    - name: reload apache (Rocky)
+      ansible.builtin.shell: |
+        killall httpd || true
+        nohup /usr/sbin/httpd -DFOREGROUND > /var/log/httpd_foreground.log 2>&1 &
+      args:
+        executable: /bin/bash
+      when: ansible_distribution == "Rocky"

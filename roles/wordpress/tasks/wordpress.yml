@@ -1,0 +1,75 @@
+
+---
+# === WordPress Deployment ===
+- name: Download WordPress archive
+  ansible.builtin.get_url:
+    url: "{{ wordpress_url }}"
+    dest: /tmp/wordpress.zip
+    mode: '0755'
+
+- name: Remove default Apache homepage
+  ansible.builtin.file:
+    path: "{{ wordpress_site_dir }}/index.html"
+    state: absent
+
+- name: Create temporary WordPress extraction directory
+  ansible.builtin.file:
+    path: /tmp/wordpress_extract
+    state: directory
+
+- name: Extract WordPress archive to temporary directory
+  ansible.builtin.unarchive:
+    src: /tmp/wordpress.zip
+    dest: /tmp/wordpress_extract
+    remote_src: yes
+
+- name: Move WordPress files to web directory
+  ansible.builtin.shell: |
+    cp -r /tmp/wordpress_extract/wordpress/* {{ wordpress_site_dir }}/
+    chown -R {{ apache_user }}:{{ apache_user }} {{ wordpress_site_dir }}
+
+- name: Clean up temporary files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/wordpress.zip
+    - /tmp/wordpress_extract
+
+- name: Generate WordPress configuration file
+  ansible.builtin.template:
+    src: wp-config.php.j2
+    dest: "{{ wordpress_site_dir }}/wp-config.php"
+    mode: '0640'
+    owner: "{{ apache_user }}"
+    group: "{{ apache_user }}"
+
+# === Apache Configuration ===
+- name: Deploy WordPress Apache configuration (Rocky)
+  ansible.builtin.copy:
+    src: apache-rocky.conf
+    dest: /etc/httpd/conf.d/wordpress.conf
+    mode: '0644'
+  when: ansible_distribution == "Rocky"
+  notify: reload apache (Rocky)
+
+- name: Deploy WordPress Apache configuration (Ubuntu)
+  ansible.builtin.copy:
+    src: apache-debian.conf
+    dest: /etc/apache2/sites-available/wordpress.conf
+    mode: '0644'
+  when: ansible_distribution == "Ubuntu"
+  notify: restart apache (Ubuntu)
+
+- name: Enable WordPress site (Ubuntu)
+  ansible.builtin.command: a2ensite wordpress.conf
+  when: ansible_distribution == "Ubuntu"
+
+- name: Enable Apache rewrite module (Ubuntu)
+  ansible.builtin.command: a2enmod rewrite
+  when: ansible_distribution == "Ubuntu"
+
+# === Final Information ===
+- name: Display WordPress access URL
+  ansible.builtin.debug:
+    msg: "WordPress is installed and accessible at http://localhost"

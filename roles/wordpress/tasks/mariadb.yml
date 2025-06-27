@@ -1,0 +1,73 @@
+---
+- name: Ensure /var/lib/mysql directory ownership
+  ansible.builtin.file:
+    path: /var/lib/mysql
+    owner: mysql
+    group: mysql
+    recurse: true
+  when: ansible_distribution in ["Ubuntu", "Rocky"]
+
+- name: Initialize MariaDB if needed
+  ansible.builtin.command: >
+    mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+  args:
+    creates: /var/lib/mysql/mysql
+  when: ansible_distribution in ["Ubuntu", "Rocky"]
+
+- name: Start MariaDB without systemd (using mysqld_safe)
+  ansible.builtin.shell: "nohup mysqld_safe --user=mysql &"
+  async: 10
+  poll: 0
+  when: ansible_distribution in ["Ubuntu", "Rocky"]
+
+- name: Wait for MariaDB to start
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Wait for MariaDB port availability
+  ansible.builtin.wait_for:
+    port: 3306
+    delay: 5
+    timeout: 60
+    state: started
+
+- name: Check if MariaDB is already secured
+  ansible.builtin.shell: mysql -u root -e "SELECT 1;" 
+  register: mysql_root_access
+  ignore_errors: true
+
+- name: Secure MariaDB installation
+  ansible.builtin.shell: |
+    mysql -u root <<EOF
+    ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ wordpress_db_root_password }}';
+    DELETE FROM mysql.user WHERE User='';
+    DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+    DROP DATABASE IF EXISTS test;
+    DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+    FLUSH PRIVILEGES;
+    EOF
+  when: mysql_root_access.rc == 0
+
+- name: Create MySQL root credentials file
+  ansible.builtin.copy:
+    content: |
+      [client]
+      user=root
+      password={{ wordpress_db_root_password }}
+    dest: /root/.my.cnf
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Create WordPress database
+  community.mysql.mysql_db:
+    name: "{{ wordpress_db_name }}"
+    state: present
+
+- name: Create WordPress database user
+  community.mysql.mysql_user:
+    name: "{{ wordpress_db_user }}"
+    password: "{{ wordpress_db_password }}"
+    priv: "{{ wordpress_db_name }}.*:ALL"
+    host: "%"
+    state: present

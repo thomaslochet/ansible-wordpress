@@ -1,0 +1,61 @@
+---
+- name: Remove default Apache index page
+  ansible.builtin.file:
+    path: /var/www/html/index.html
+    state: absent
+
+- name: Create /run/php-fpm directory if missing
+  ansible.builtin.file:
+    path: /run/php-fpm
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: ansible_distribution == "Rocky"
+
+# === PHP-FPM (Rocky) ===
+- name: Start PHP-FPM service (Rocky) without systemd
+  ansible.builtin.shell: "nohup php-fpm --fpm-config /etc/php-fpm.conf &"
+  async: 10
+  poll: 0
+  when: ansible_distribution == "Rocky"
+
+- name: Wait for PHP-FPM socket availability
+  ansible.builtin.wait_for:
+    path: /run/php-fpm/www.sock
+    state: present
+    timeout: 30
+  when: ansible_distribution == "Rocky"
+
+# === Apache ===
+- name: Start Apache service without systemd (Ubuntu)
+  ansible.builtin.shell: "service apache2 start"
+  args:
+    creates: /var/run/apache2/apache2.pid
+  when: ansible_distribution == "Ubuntu"
+
+- name: Start Apache service without systemd (Rocky)
+  ansible.builtin.shell: "nohup /usr/sbin/httpd -DFOREGROUND &"
+  args:
+    creates: /var/run/httpd/httpd.pid
+  async: 10
+  poll: 0
+  when: ansible_distribution == "Rocky"
+
+# === WordPress Database Setup ===
+- name: Create WordPress database
+  community.mysql.mysql_db:
+    name: "{{ wordpress_db_name }}"
+    state: present
+    login_user: root
+    login_password: "{{ wordpress_db_root_password }}"
+
+- name: Create WordPress MySQL user
+  community.mysql.mysql_user:
+    name: "{{ wordpress_db_user }}"
+    password: "{{ wordpress_db_password }}"
+    priv: "{{ wordpress_db_name }}.*:ALL"
+    host: "localhost"
+    state: present
+    login_user: root
+    login_password: "{{ wordpress_db_root_password }}"
