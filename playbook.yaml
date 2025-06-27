@@ -1,5 +1,5 @@
-- name: Deploy WordPress role
+- name: Deploy WordPress
   hosts: all
   become: true
-  roles:
-    - wordpress
+  tasks:
+    - import_tasks: tasks/main.yml
